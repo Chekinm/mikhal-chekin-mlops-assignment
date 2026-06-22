@@ -1,0 +1,120 @@
+[
+  {
+    "question": "What is the coordinates location of the circuits for Australian grand prix?",
+    "db_id": "formula_1",
+    "gold_sql": "SELECT DISTINCT T1.lat, T1.lng FROM circuits AS T1 INNER JOIN races AS T2 ON T2.circuitID = T1.circuitId WHERE T2.name = 'Australian Grand Prix'",
+    "agent_sql": "SELECT c.lat, c.lng\nFROM circuits c\nJOIN races r ON c.circuitId = r.circuitId\nWHERE r.name = 'Australian Grand Prix';",
+    "iterations": 1,
+    "ok": true,
+    "revise_triggered": false,
+    "history": [
+      {
+        "node": "generate_sql",
+        "sql": "SELECT c.lat, c.lng\nFROM circuits c\nJOIN races r ON c.circuitId = r.circuitId\nWHERE r.name = 'Australian Grand Prix';"
+      },
+      {
+        "node": "verify",
+        "ok": true,
+        "issue": ""
+      }
+    ]
+  },
+  {
+    "question": "List down Ajax's superpowers.",
+    "db_id": "superhero",
+    "gold_sql": "SELECT T3.power_name FROM superhero AS T1 INNER JOIN hero_power AS T2 ON T1.id = T2.hero_id INNER JOIN superpower AS T3 ON T2.power_id = T3.id WHERE T1.superhero_name = 'Ajax'",
+    "agent_sql": "SELECT sp.power_name\nFROM superhero s\nJOIN hero_power hp ON s.id = hp.hero_id\nJOIN superpower sp ON hp.power_id = sp.id\nWHERE s.superhero_name = 'Ajax';",
+    "iterations": 1,
+    "ok": true,
+    "revise_triggered": false,
+    "history": [
+      {
+        "node": "generate_sql",
+        "sql": "SELECT sp.power_name\nFROM superhero s\nJOIN hero_power hp ON s.id = hp.hero_id\nJOIN superpower sp ON hp.power_id = sp.id\nWHERE s.superhero_name = 'Ajax';"
+      },
+      {
+        "node": "verify",
+        "ok": true,
+        "issue": ""
+      }
+    ]
+  },
+  {
+    "question": "List the top five schools, by descending order, from the highest to the lowest, the most number of Enrollment (Ages 5-17). Please give their NCES school identification number.",
+    "db_id": "california_schools",
+    "gold_sql": "SELECT T1.NCESSchool FROM schools AS T1 INNER JOIN frpm AS T2 ON T1.CDSCode = T2.CDSCode ORDER BY T2.`Enrollment (Ages 5-17)` DESC LIMIT 5",
+    "agent_sql": "SELECT s.\"NCESSchool\", f.\"Enrollment (Ages 5-17)\"\nFROM \"schools\" s\nJOIN \"frpm\" f ON s.\"CDSCode\" = f.\"CDSCode\"\nORDER BY f.\"Enrollment (Ages 5-17)\" DESC\nLIMIT 5;",
+    "iterations": 1,
+    "ok": true,
+    "revise_triggered": false,
+    "history": [
+      {
+        "node": "generate_sql",
+        "sql": "SELECT s.\"NCESSchool\", f.\"Enrollment (Ages 5-17)\"\nFROM \"schools\" s\nJOIN \"frpm\" f ON s.\"CDSCode\" = f.\"CDSCode\"\nORDER BY f.\"Enrollment (Ages 5-17)\" DESC\nLIMIT 5;"
+      },
+      {
+        "node": "verify",
+        "ok": true,
+        "issue": ""
+      }
+    ]
+  },
+  {
+    "question": "What is the average number of crimes committed in 1995 in regions where the number exceeds 4000 and the region has accounts that are opened starting from the year 1997?",
+    "db_id": "financial",
+    "gold_sql": "SELECT AVG(T1.A15) FROM district AS T1 INNER JOIN account AS T2 ON T1.district_id = T2.district_id WHERE STRFTIME('%Y', T2.date) >= '1997' AND T1.A15 > 4000",
+    "agent_sql": "SELECT AVG(d.A14) AS average_crimes\nFROM district d\nWHERE d.A14 > 4000\n  AND EXISTS (\n    SELECT 1\n    FROM account a\n    WHERE a.district_id = d.district_id\n      AND CAST(strftime('%Y', a.date) AS INTEGER) >= 1997\n  )\n  AND d.A14 IS NOT NULL;",
+    "iterations": 3,
+    "ok": true,
+    "revise_triggered": true,
+    "history": [
+      {
+        "node": "generate_sql",
+        "sql": "SELECT AVG(d.A14) AS average_crimes\nFROM district d\nWHERE d.A14 > 4000\n  AND EXISTS (\n    SELECT 1\n    FROM account a\n    WHERE a.district_id = d.district_id\n      AND strftime('%Y', a.date) >= '1997'\n  );"
+      },
+      {
+        "node": "verify",
+        "ok": false,
+        "issue": "The execution result shows 'None' for the first rows, indicating an empty result set. However, the question asks for the average number of crimes in regions where the number exceeds 4000 and the region has accounts opened from 1997. The SQL query is logically sound and should return a non-empty result if such regions exist. The absence of any returned value (despite 'OK: 1 rows') suggests either a data issue or a misinterpretation. Since the result is empty but the question implies a non-empty answer (e.g., 'what is the average'), and no error occurred, the issue is that the result is empty when a non-empty result is expected. Therefore, the answer is not plausibly correct."
+      },
+      {
+        "node": "revise",
+        "sql": "SELECT AVG(d.A14) AS average_crimes\nFROM district d\nWHERE d.A14 > 4000\n  AND EXISTS (\n    SELECT 1\n    FROM account a\n    WHERE a.district_id = d.district_id\n      AND CAST(strftime('%Y', a.date) AS INTEGER) >= 1997\n  );"
+      },
+      {
+        "node": "verify",
+        "ok": false,
+        "issue": "The execution result shows 'None' for the first row, which indicates that the query returned no data. However, the question asks for the average number of crimes in 1995, but the SQL query does not filter for the year 1995. The column A14 likely represents crime counts, but there is no condition to ensure the data corresponds to the year 1995. This is a critical omission, as the question explicitly specifies 'in 1995'. Therefore, the SQL does not answer the question correctly."
+      },
+      {
+        "node": "revise",
+        "sql": "SELECT AVG(d.A14) AS average_crimes\nFROM district d\nWHERE d.A14 > 4000\n  AND EXISTS (\n    SELECT 1\n    FROM account a\n    WHERE a.district_id = d.district_id\n      AND CAST(strftime('%Y', a.date) AS INTEGER) >= 1997\n  )\n  AND d.A14 IS NOT NULL;"
+      },
+      {
+        "node": "verify",
+        "ok": false,
+        "issue": "The execution result shows 'None' for the first rows, indicating an empty result set. However, the SQL query is logically sound and should return a non-empty result if there are districts meeting the criteria. The absence of any data suggests either no districts satisfy the conditions (which is possible but unlikely given the question's implication of a meaningful answer) or a flaw in the data handling. Since the question asks for the average number of crimes in 1995 in regions meeting specific conditions, and the result is empty, this implies the query did not find any matching records. The issue is that the query may be incorrectly filtering data\u2014specifically, the column A14 is assumed to represent crimes in 1995, but the schema does not confirm this. Without confirmation that A14 corresponds to 1995 crime data, the query is based on an unverified assumption. Additionally, the result being empty despite the query structure being correct suggests a data or schema mismatch. Therefore, the result is not plausible given the question's intent."
+      }
+    ]
+  },
+  {
+    "question": "How many male clients in 'Hl.m. Praha' district?",
+    "db_id": "financial",
+    "gold_sql": "SELECT COUNT(T1.client_id) FROM client AS T1 INNER JOIN district AS T2 ON T1.district_id = T2.district_id WHERE T1.gender = 'M' AND T2.A2 = 'Hl.m. Praha'",
+    "agent_sql": "SELECT COUNT(*) \nFROM client c\nJOIN district d ON c.district_id = d.district_id\nWHERE c.gender = 'M' AND d.A2 = 'Hl.m. Praha';",
+    "iterations": 1,
+    "ok": true,
+    "revise_triggered": false,
+    "history": [
+      {
+        "node": "generate_sql",
+        "sql": "SELECT COUNT(*) \nFROM client c\nJOIN district d ON c.district_id = d.district_id\nWHERE c.gender = 'M' AND d.A2 = 'Hl.m. Praha';"
+      },
+      {
+        "node": "verify",
+        "ok": true,
+        "issue": ""
+      }
+    ]
+  }
+]
