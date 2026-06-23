@@ -14,13 +14,19 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 DB_DIR = ROOT / "data" / "bird"
 
+# Rough character budget for schema in prompt (~4 chars per token, keep under 4K tokens).
+# This prevents context overflow on large DBs like european_football_2.
+_SCHEMA_CHAR_BUDGET = 16_000
+
 
 def db_path(db_id: str) -> Path:
     return DB_DIR / f"{db_id}.sqlite"
 
 
-def _q(ident: str) -> str:
+def _q(ident) -> str:
     """Double-quote a SQL identifier, escaping any embedded quotes."""
+    if ident is None:
+        return "NULL"
     return '"' + ident.replace('"', '""') + '"'
 
 
@@ -41,7 +47,7 @@ def render_schema(db_id: str) -> str:
             )
         ]
         for t in tables:
-            parts.append(f"\nCREATE TABLE {_q(t)} (")
+            table_parts = [f"\nCREATE TABLE {_q(t)} ("]
             col_lines: list[str] = []
             for _cid, name, ctype, notnull, _dflt, pk in conn.execute(f"PRAGMA table_info({_q(t)})"):
                 line = f"  {_q(name)} {ctype}"
@@ -55,8 +61,17 @@ def render_schema(db_id: str) -> str:
                 col_lines.append(
                     f"  FOREIGN KEY ({_q(fk[3])}) REFERENCES {_q(fk[2])}({_q(fk[4])})"
                 )
-            parts.append(",\n".join(col_lines))
-            parts.append(");")
+            table_parts.append(",\n".join(col_lines))
+            table_parts.append(");")
+            table_str = "\n".join(table_parts)
+
+            # Stop adding tables if we'd exceed the character budget.
+            current_len = sum(len(p) for p in parts)
+            if current_len + len(table_str) > _SCHEMA_CHAR_BUDGET:
+                parts.append(f"\n-- ... {len(tables) - tables.index(t)} more tables truncated (schema too large)")
+                break
+            parts.extend(table_parts)
+
     return "\n".join(parts)
 
 

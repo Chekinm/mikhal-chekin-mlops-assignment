@@ -31,18 +31,31 @@ class ExecutionResult:
             " | ".join(str(c) for c in row) for row in (self.rows or [])[:max_rows]
         )
         more = f"\n... ({self.row_count - max_rows} more rows)" if self.row_count > max_rows else ""
-        return f"OK: {self.row_count} rows.\nCOLUMNS: {cols}\nFIRST ROWS:\n{preview}{more}"
+        result = f"OK: {self.row_count} rows.\nCOLUMNS: {cols}\nFIRST ROWS:\n{preview}{more}"
+        # Truncate to avoid context overflow on wide tables (e.g. XML columns)
+        max_chars = 2000
+        if len(result) > max_chars:
+            result = result[:max_chars] + "\n... (truncated)"
+        return result
 
 
-def execute_sql(db_id: str, sql: str, timeout_seconds: float = 5.0) -> ExecutionResult:
+def execute_sql(db_id: str, sql: str, timeout_seconds: float = 2.0) -> ExecutionResult:
     """Run SQL against db_id's sqlite, return result or error."""
     path = db_path(db_id)
     try:
+        import threading
         with sqlite3.connect(
             f"file:{path}?mode=ro",
             uri=True,
             timeout=timeout_seconds,
         ) as conn:
+            # Interrupt long-running queries (progress handler fires every N opcodes)
+            deadline = [False]
+            def _watchdog():
+                import time; time.sleep(timeout_seconds)
+                deadline[0] = True
+                conn.interrupt()
+            t = threading.Thread(target=_watchdog, daemon=True); t.start()
             cur = conn.execute(sql)
             cols = [d[0] for d in cur.description] if cur.description else []
             rows = cur.fetchall()
