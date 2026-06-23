@@ -10,6 +10,8 @@ GENERATE_SQL_SYSTEM = """You are an expert SQL assistant. Your job is to write a
 
 Target dialect is SQLite. Use only SQLite-supported syntax (no ILIKE, no full-outer-join shortcuts). Quote identifiers with double quotes when they may be reserved words. Return a single SELECT statement.
 
+Never use SELECT *; select only the columns needed to answer the question.
+Keep the SQL concise. Never generate SQL longer than 20 lines. Avoid large CASE WHEN blocks, prefer JOINs and WHERE clauses.
 Return ONLY the executable SQL query wrapped inside a ```sql ... ``` code block. Do not write any conversational text or explanations."""
 
 # Available placeholders: {schema}, {question}
