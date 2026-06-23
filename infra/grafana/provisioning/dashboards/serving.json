@@ -197,7 +197,7 @@
         {
           "refId": "A",
           "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "vllm:gpu_cache_usage_perc",
+          "expr": "vllm:kv_cache_usage_perc",
           "legendFormat": "GPU KV cache %"
         }
       ],
