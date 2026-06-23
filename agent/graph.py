@@ -61,6 +61,11 @@ def llm() -> ChatOpenAI:
         temperature=0.0,
         max_tokens=1024,  # cap generation: a single SELECT never needs more, and this
                           # stops degenerate runaway loops from burning the context window
+        frequency_penalty=0.5,  # penalize tokens proportionally to prior frequency; bumped
+                                # from 0.3 because revise re-feeds the prior SQL and needs a
+                                # stronger brake on the "AND ... NOT LIKE" repetition loop
+        presence_penalty=0.3,   # nudge the model off an already-used pattern so it can
+                                # finish a coherent query instead of looping
     )
 
 
