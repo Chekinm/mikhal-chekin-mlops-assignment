@@ -59,6 +59,8 @@ def llm() -> ChatOpenAI:
         base_url=VLLM_BASE_URL,
         api_key=LLM_API_KEY,  # vLLM ignores the key but the SDK requires a string
         temperature=0.0,
+        max_tokens=1024,  # cap generation: a single SELECT never needs more, and this
+                          # stops degenerate runaway loops from burning the context window
     )
 
 
