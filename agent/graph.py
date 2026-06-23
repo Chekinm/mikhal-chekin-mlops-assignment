@@ -37,6 +37,22 @@ VLLM_BASE_URL = os.environ.get("NEBIUS_BASE_URL", "http://localhost:8000/v1")
 VLLM_MODEL = os.environ.get("NEBIUS_MODEL", "Qwen/Qwen3-30B-A3B-Instruct-2507")
 LLM_API_KEY = os.environ.get("NEBIUS_API_KEY")
 
+_BASE_LLM = ChatOpenAI(
+    model=VLLM_MODEL,
+    openai_api_key="compiler-is-happy",
+    openai_api_base=VLLM_BASE_URL,
+    temperature=0.0,
+    max_tokens=1024,# cap generation: a single SELECT never needs more, and this
+                    # stops degenerate runaway loops from burning the context window
+    model_kwargs={
+        "frequency_penalty": 0.5,# penalize tokens proportionally to prior frequency; bumped
+                                 # from 0.3 because revise re-feeds the prior SQL and needs a
+                                 # stronger brake on the "AND ... NOT LIKE" repetition loop             
+        "presence_penalty": 0.3, # nudge the model off an already-used pattern so it can
+                                 # finish a coherent query instead of looping
+    }
+)
+
 @dataclass
 class AgentState:
     """State threaded through the graph. Extend with fields you need."""
@@ -54,20 +70,7 @@ class AgentState:
 
 def llm() -> ChatOpenAI:
     """Chat client pointed at the local vLLM endpoint."""
-    return ChatOpenAI(
-        model=VLLM_MODEL,
-        base_url=VLLM_BASE_URL,
-        api_key=LLM_API_KEY,  # vLLM ignores the key but the SDK requires a string
-        temperature=0.0,
-        max_tokens=1024,  # cap generation: a single SELECT never needs more, and this
-                          # stops degenerate runaway loops from burning the context window
-        frequency_penalty=0.5,  # penalize tokens proportionally to prior frequency; bumped
-                                # from 0.3 because revise re-feeds the prior SQL and needs a
-                                # stronger brake on the "AND ... NOT LIKE" repetition loop
-        presence_penalty=0.3,   # nudge the model off an already-used pattern so it can
-                                # finish a coherent query instead of looping
-    )
-
+    return _BASE_LLM
 
 # ---- Nodes ------------------------------------------------------------
 
@@ -129,7 +132,7 @@ def verify_node(state: AgentState) -> dict:
     execution = state.execution
     rendered = execution.render() if execution is not None else "ERROR: no execution result"
 
-    response = llm().invoke([
+    response = llm().bind(max_tokens=128).invoke([
         ("system", prompts.VERIFY_SYSTEM),
         ("user", prompts.VERIFY_USER.format(
             question=state.question,
@@ -166,7 +169,7 @@ def revise_node(state: AgentState) -> dict:
 
     Return: {"sql": <str>, "iteration": state.iteration + 1, ...}.
     """
-    response = llm().invoke([
+    response = llm().bind(max_tokens=384).invoke([
         ("system", prompts.REVISE_SYSTEM),
         ("user", prompts.REVISE_USER.format(
             schema=state.schema,
